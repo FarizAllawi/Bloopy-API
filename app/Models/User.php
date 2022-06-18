@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\HasApiTokens;
+use App\Models\Business\Business;
+use Illuminate\Support\Facades\Bus;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -49,4 +51,10 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public function business() {
+        return $this->belongsToMany(Business::class, 'user_business', 'userBusiness_user', 'userBusiness_business')
+                    ->withPivot('userBusiness_status')
+                    ->as('userBusiness');
+    }
 }
