@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\v1;
+namespace App\Http\Controllers;
 
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use Laravel\Socialite\Facades\Socialite;
@@ -83,7 +83,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(),[
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => $request->query('email') ? 'required|string|email|max:255' : 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8'
         ]);
 
@@ -94,15 +94,65 @@ class AuthController extends Controller
                 'errors' => $validator->errors()
             ], 422);       
         }
+        
+        $user = new User();
+        // Register user from invitation
+        if ($request->query('email') && $request->query('token')) {
+            // Check user in database
+            $user = User::where('email', '=', $request->query('email'))
+                        ->first();
 
-        $user = User::create([
-            'user_name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'user_role' => 'user',
-        ]);
+            // Validate Token
+            $token = sha1('Bloopy-Invitation-'.$user->email.'-'.$user->created_at);
+            if (!hash_equals((string) $request->query('token'), $token)) {
+                // -- Token not valid --
+                // check the request email first
+                
+                $email = User::where('email','=',$request->email)->first();
+                if ($email) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'the given data invalid',
+                        'errors' => [
+                           'email' => 'The email is already taken'
+                        ]
+                    ], 422); 
+                } 
 
-        event(new Registered($user));
+                $user = $user = User::create([
+                    'user_name' => $request->name,
+                    'email' => $request->email,
+                    'password' => Hash::make($request->password),
+                    'user_role' => 'user',
+                 ]);
+
+                 event(new Registered($user));
+            }
+
+            // Token Is valid
+            $user->user_name = $request->name;
+            $user->password = Hash::make($request->password);
+            // If request email match with query email
+            if ($request->email === $user->email) {
+                $user->markEmailAsVerified();
+                event(new Verified($user));
+                Mail::to($user->email)->send(new AfterRegister($user));
+            }
+            else {
+                $user->email = $request->email;
+                event(new Registered($user));
+            }
+            $user->save();
+        
+        } else {
+            $user->user_name = $request->name;
+            $user->email = $request->email;
+            $user->password = Hash::make($request->password);
+            $user->user_role = 'user';
+            $user->save();
+            event(new Registered($user));
+        }
+
          /**
          * We are authenticating a request from our frontend
          */

@@ -1,6 +1,4 @@
 @component('mail::message')
-# Introduction
-
 Hi {{$user->user_name}}
 <br>
 Welcome to Bloopy, your account has been created successfully.
