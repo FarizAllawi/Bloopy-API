@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Mail\AfterRegister;
+use App\Mail\VerificationCodeNotification;
 use App\Models\User;
 use Mail;
 
@@ -150,13 +151,13 @@ class AuthController extends Controller
             $user->password = Hash::make($request->password);
             $user->user_role = 'user';
             $user->save();
-            event(new Registered($user));
         }
 
          /**
          * We are authenticating a request from our frontend
          */
         if (EnsureFrontendRequestsAreStateful::fromFrontend($request)){
+            event(new Registered($user));
             Auth::login($user);
             return response()->json([
                 'status' => 'success',
@@ -165,12 +166,18 @@ class AuthController extends Controller
         }
         
         // Use token authentication.
+        $emailNotification = $this->emailNotification('code', $user, $request->query('platform') , $request->query('app'));
         return response()->json([
             'status' => 'success',
             'message' => 'Email Verfication Sent',
             'data' => [
-                'token' => $user->createToken('Auth Token : '.$user->email)->accessToken
-            ]
+                'user' => [
+                    'user_id' => $user->id,
+                    'verification_token' => $emailNotification->original['data']['token']
+                ],
+                'token' => $user->createToken('Auth Token : '.$user->email)->accessToken,
+                
+            ],
         ]);
 
     }
@@ -222,31 +229,116 @@ class AuthController extends Controller
         return  redirect()->intended(config('app.frontend_url'));
     }
 
-    public function emailVerify(Request $request, $id, $hash) 
+    public function emailNotification($type = null, $user = null, $platform = null, $app = null) 
+    {
+        $request = request();
+        $user    = $user ? $user : $request->user();
+
+        if ($user->hasVerifiedEmail() ) 
+        {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'The user has verified the email'
+            ]);
+        }
+
+        if ($request->query('type') === 'code' || $type === 'code') 
+        {
+            $platform = $request->query('platform') ? $request->query('platform') : $platform;
+            $app      = $request->query('app') ? $request->query('app') : $app;
+            $code     = collect([1,2,3,4,5,6,7,8,9,0])->random(4);
+            $code     = $code[0].$code[1].$code[2].$code[3];
+            $token    = sha1('BloopyVerivicationCode-'.$user->email.'-'.$code);
+            
+            Mail::to($user->email)->send(new VerificationCodeNotification($user, $code, $platform, $app));
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Code verification sent',
+                'data' => [
+                    'token' => $token
+                ]
+            ]);
+        }
+
+        $request->user()->sendEmailVerificationNotification();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'verification link sent',
+            
+        ]);
+
+    }
+
+    public function emailVerify(Request $request, $id, $token) 
     {
         $user = User::find($id);
+        if ($request->query('type') && $request->query('type') === 'link') {
+            if (!$user) {
+                return $this->redirectUsers($request->query('app'), '/user-not-found');
+            }
 
-        if (!$user) {
-            return redirect()->intended(
-                config('app.frontend_url').'/user-not-found'
-            );
+            // Validate token
+            if (! hash_equals((string) $token, sha1($user->email))) {
+                return $this->redirectUsers($request->query('app'), '/token-invalid');
+            } 
         }
+        
+        if ($request->query('type') && $request->query('type') === 'code') {
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'User not found, please register'
+                ], 422);       
+            }
 
-        if (! hash_equals((string) $hash, sha1($user->email))) {
-            return redirect()->intended(
-                config('app.frontend_url').'/user-not-found'
-            );
+            $validator = Validator::make($request->all(),[
+                'code' => 'required|integer',
+            ]);
+    
+            if($validator->fails()){
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'the given data invalid',
+                    'errors' => $validator->errors()
+                ], 422);       
+            }
+
+            // Validate Token
+            $tokenFormula = sha1('BloopyVerivicationCode-'.$user->email.'-'.$request->code);
+            if (!hash_equals((string) $token , $tokenFormula)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'invalid code',
+                ], 422);  
+            }
         }
+        
         
         if (!$user->hasVerifiedEmail()) {
             $user->markEmailAsVerified();
             event(new Verified($user));
         }
         
-        return redirect()->intended(
-            config('app.frontend_url').'/email-verified'
-        );
+        if ($request->query('type') && $request->query('type') === 'code') {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'User Verified',
+            ]);     
+        }
+
+        return $this->redirectUsers($request->query('app'), '/email-verified');
     }
+
+
+    public function redirectUsers($app, $redirect) 
+    {
+        return $app === 'web' ? redirect()->intended(
+                                    config('app.frontend_url').$redirect
+                                )
+                              : redirect()->away($redirect);
+    }
+
 
     /**
      * Ensure the login request is not rate limited.

@@ -10,6 +10,10 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+Route::middleware(['auth:sanctum, verified'])->group(function() {
+    Route::get('/auth/user', [AuthController::class, 'user']);
+});
+
 Route::post('/auth/register', [AuthController::class, 'register'])
                 ->middleware('guest')
                 ->name('register');
@@ -27,13 +31,16 @@ Route::post('/auth/reset-password', [NewPasswordController::class, 'store'])
                 ->name('password.update');
 
 Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'emailVerify'])
-                ->name('verification.verify');
+     ->name('verification.verify');
 
-Route::post('/auth/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+Route::post('/auth/verify-email/{id}/{hash}', [AuthController::class, 'emailVerify'])
+     ->name('verification.verify');
+
+Route::post('/auth/email/verification-notification', [AuthController::class, 'emailNotification'])
                 ->middleware(['auth', 'throttle:6,1'])
                 ->name('verification.send');
 
-Route::post('auth/logout', [AuthenticatedSessionController::class, 'destroy'])
+Route::post('auth/logout', [AuthController::class, 'logout'])
                 ->middleware('auth')
                 ->name('logout');
 

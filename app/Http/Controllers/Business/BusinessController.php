@@ -95,10 +95,10 @@ class BusinessController extends Controller
 
     public function getInvitation(Request $request) 
     {
-        $business = Business::find($request->input('business'));
+        $business = Business::find($request->query('business'));
 
-        $invitation = Invitation::where('userInvitation_email', '=', $request->input('recipant'))
-                                ->where('userInvitation_token', '=', $request->input('token'))
+        $invitation = Invitation::where('userInvitation_email', '=', $request->query('recipant'))
+                                ->where('userInvitation_token', '=', $request->query('token'))
                                 ->first();
 
         // Check business & email
@@ -124,34 +124,42 @@ class BusinessController extends Controller
                 config('app.frontend_url').'/token-expired'
             );
         }
-        $userBusiness = new UserBusiness();
 
         // Find user
-        $user = User::where('email','=',$request->input('recipant'))
+        $user = User::where('email','=',$request->query('recipant'))
                     ->first();
 
         if (!$user) {
             $user = new User();
-            $user->email = $request->input('recipant');
+            $user->email = $request->query('recipant');
             $user->user_role = 'user';
             $user->save();
-            $token = sha1('Bloopy-Invitation-'.$user->email.'-'.$user->created_at);
+            $token = sha1('Bloopy-Invitation-'.$user->email.'-'.$user->created_at);            
+        }
 
-            //Add user to userBusiness 
-            $userBusiness->userBusiness_user = $user->id;
-            $userBusiness->userBusiness_business = $business->id;
-            $userBusiness->save();
+        // Check is user already in business
+        $userBusiness = UserBusiness::where('userBusiness_business', '=', $business->id)
+                                    ->where('userBusiness_user','=',$user->id)
+                                    ->first();
 
+        if ($userBusiness) {
             return redirect()->intended(
-                config('app.frontend_url').'/auth/register?email='.$user->email.'&token='.$token
+                config('app.frontend_url').'/user-invited'
             );
         }
 
         //Add user to userBusiness 
         $userBusiness->userBusiness_user = $user->id;
         $userBusiness->userBusiness_business = $business->id;
+        $userBusiness->userBusiness_status = $request->query('status');
         $userBusiness->save();
 
+
+        if (!$user) {
+            return redirect()->intended(
+                config('app.frontend_url').'/auth/register?email='.$user->email.'&token='.$token
+            );
+        }
         return redirect()->intended(
             config('app.frontend_url').'/user-invited'
         );
