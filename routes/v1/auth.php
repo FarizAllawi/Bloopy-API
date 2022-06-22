@@ -10,9 +10,6 @@ use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum, verified'])->group(function() {
-    Route::get('/auth/user', [AuthController::class, 'user']);
-});
 
 Route::post('/auth/register', [AuthController::class, 'register'])
                 ->middleware('guest')

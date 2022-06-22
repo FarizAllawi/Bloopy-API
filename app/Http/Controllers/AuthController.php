@@ -7,15 +7,16 @@ use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Auth\Events\Lockout;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Notifications\VerificationUser;
+use App\Notifications\RegisterUser;
 use App\Mail\AfterRegister;
-use App\Mail\VerificationCodeNotification;
 use App\Models\User;
 use Mail;
 
@@ -24,9 +25,10 @@ class AuthController extends Controller
 
     public function user(Request $request) 
     {
+        $user = auth()->user();
         return response()->json([
             'status' => 'success',
-            'data' => $request->user()
+            'data' => $user
         ]);
     }
 
@@ -157,7 +159,7 @@ class AuthController extends Controller
          * We are authenticating a request from our frontend
          */
         if (EnsureFrontendRequestsAreStateful::fromFrontend($request)){
-            event(new Registered($user));
+            $emailNotification = $this->emailNotification('link', $user);
             Auth::login($user);
             return response()->json([
                 'status' => 'success',
@@ -182,20 +184,24 @@ class AuthController extends Controller
 
     }
 
-    public function logout() 
+    public function logout(Request $request) 
     {
         // Frontend Logout
-        if (EnsureFrontendRequestsAreStateful::fromFrontend(request())) {
+        if (EnsureFrontendRequestsAreStateful::fromFrontend(request())) 
+        {
             Auth::guard('web')->logout();
             request()->session()->invalidate();
             request()->session()->regenerateToken();
+        } else {
+            // token logout.
+            $accessToken = auth()->user()->token();
+            $token= $request->user()->tokens->find($accessToken);
+            $token->revoke();
         }
-        // token logout.
-        $user = Auth::user();
-        $user->token->delete(); 
+        
         return response()->json([
             'status'  => 'success',
-            'message' => 'You have successfully logged out and the token was successfully deleted'
+            'message' => 'You have successfully logged out and the token was successfully deleted',
         ]);
     }
 
@@ -233,6 +239,7 @@ class AuthController extends Controller
     {
         $request = request();
         $user    = $user ? $user : $request->user();
+        $type    = $request->query('type') ? $request->query('type') : $type;
 
         if ($user->hasVerifiedEmail() ) 
         {
@@ -242,7 +249,7 @@ class AuthController extends Controller
             ]);
         }
 
-        if ($request->query('type') === 'code' || $type === 'code') 
+        if ( $type === 'code') 
         {
             $platform = $request->query('platform') ? $request->query('platform') : $platform;
             $app      = $request->query('app') ? $request->query('app') : $app;
@@ -250,7 +257,7 @@ class AuthController extends Controller
             $code     = $code[0].$code[1].$code[2].$code[3];
             $token    = sha1('BloopyVerivicationCode-'.$user->email.'-'.$code);
             
-            Mail::to($user->email)->send(new VerificationCodeNotification($user, $code, $platform, $app));
+            $user->notify(new VerificationUser($type, $user, $code, $platform, $app));
             return response()->json([
                 'status' => 'success',
                 'message' => 'Code verification sent',
@@ -260,12 +267,14 @@ class AuthController extends Controller
             ]);
         }
 
-        $request->user()->sendEmailVerificationNotification();
+        if ($type === 'link') 
+        {
+            $user->notify(new VerificationUser($type, $user, '', '', ''));
+        }
         
         return response()->json([
             'status' => 'success',
             'message' => 'verification link sent',
-            
         ]);
 
     }
@@ -319,7 +328,11 @@ class AuthController extends Controller
             $user->markEmailAsVerified();
             event(new Verified($user));
         }
-        
+
+        $administator = User::where('user_role','=','admin')->get();
+        // Notify Administrator
+        Notification::send($administator, new RegisterUser($user));
+
         if ($request->query('type') && $request->query('type') === 'code') {
             return response()->json([
                 'status' => 'success',
