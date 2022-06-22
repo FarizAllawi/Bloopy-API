@@ -1,0 +1,25 @@
+@component('mail::message')
+Hi {{$user->user_name}}
+<br>
+Welcome to Bloopy {{ $platform }}, this is your verification code. 
+<br>
+
+@if($type === 'link') 
+@component('mail::button', ['url' => config('app.url').'/auth/verify-email/'.$user->id.'/'.sha1($user->email)])
+Verify Email Address
+@endcomponent
+@endif
+
+@if($type === 'code') 
+<center>
+    <strong><span>{{$code[0]}} {{$code[1]}} {{$code[2]}} {{$code[3]}}</span></strong>
+</center>
+@endif
+
+<br>
+If you don't registering in Bloopy {{ $platform }}, please ignore this email. 
+And if you do, then please input this code into Bloopy {{ $platform }} {{$app}}.
+<br><br>
+Thanks,<br>
+Bloopy {{ $platform }}
+@endcomponent

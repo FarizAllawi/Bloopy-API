@@ -10,3 +10,4 @@ if you don't want to join this business ignore this email
 Thanks,<br>
 {{$sender}} 
 @endcomponent
+
