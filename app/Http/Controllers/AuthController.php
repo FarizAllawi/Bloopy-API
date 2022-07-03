@@ -77,7 +77,8 @@ class AuthController extends Controller
             'status' => 'success',
             'message' => 'User Logged in',
             'data' => [
-                'token' => $user->createToken('Auth Token : '.$user->email)->accessToken
+                'token' => $user->createToken('Auth Token : '.$user->email)->accessToken,
+                'is_verified' => !$user->email_verified_at ? false : true,
             ]
         ]);
     }
@@ -279,16 +280,17 @@ class AuthController extends Controller
 
     }
 
-    public function emailVerify(Request $request, $id, $token) 
+    public function emailVerify(Request $request) 
     {
-        $user = User::find($id);
+
+        $user = User::find($request->user_id);
         if ($request->query('type') && $request->query('type') === 'link') {
             if (!$user) {
                 return $this->redirectUsers($request->query('app'), '/user-not-found');
             }
 
             // Validate token
-            if (! hash_equals((string) $token, sha1($user->email))) {
+            if (! hash_equals((string) $request->verification_token, sha1($user->email))) {
                 return $this->redirectUsers($request->query('app'), '/token-invalid');
             } 
         }
@@ -302,6 +304,8 @@ class AuthController extends Controller
             }
 
             $validator = Validator::make($request->all(),[
+                'user_id' => 'required|integer',
+                'verification_token' => 'required|string',
                 'code' => 'required|integer',
             ]);
     
@@ -315,7 +319,7 @@ class AuthController extends Controller
 
             // Validate Token
             $tokenFormula = sha1('BloopyVerivicationCode-'.$user->email.'-'.$request->code);
-            if (!hash_equals((string) $token , $tokenFormula)) {
+            if (!hash_equals((string) $request->verification_token , $tokenFormula)) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'invalid code',

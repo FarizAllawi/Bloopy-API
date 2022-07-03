@@ -4,16 +4,13 @@ namespace App\Models\Business;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Business\BusinessBranch;
-use App\Models\User;
 
-class Business extends Model
+class BusinessSchedule extends Model
 {
     use HasFactory;
-    protected $table = 'business';
-
+    protected $table = 'business_schedule';
     protected $fillable = [
-        'business_name', 'business_logo'
+        'businessSchedule_name', 'businessSchedule_business'
     ];
 
     protected $casts = [
@@ -21,8 +18,4 @@ class Business extends Model
         'updated_at' => 'datetime:Y-m-d H:m:s'
     ];
 
-    public function branch()
-    {
-        return $this->hasManyThrough(BusinessBranch::class, Employee::class, 'businessBranch_business');
-    }
 }

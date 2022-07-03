@@ -5,14 +5,13 @@ namespace App\Models\Business;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-
-class UserBusiness extends Model
+class BusinessOrganization extends Model
 {
     use HasFactory;
-    protected $table = 'user_business';
-    
+    protected $table = 'business_organization';
+
     protected $fillable = [
-        'userBusiness_business', 'userBusiness_user', 'userBusiness_status'
+        'businessOrganization_name', 'businessOrganization_parent','businessOrganization_business'
     ];
 
     protected $casts = [
