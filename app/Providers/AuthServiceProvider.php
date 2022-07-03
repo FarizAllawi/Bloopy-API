@@ -32,8 +32,12 @@ class AuthServiceProvider extends ServiceProvider
 
         Passport::routes();
         Passport::tokensCan([
-            'manage-company' => 'Create Company',
-            'manage-employee' => 'Create Employee',
+            'bloopy-owner' => 'Manage Company Data and has all feature on Manager and employee',
+            'bloopy-works-c-level' => 'Scope Description',
+            'bloopy-works-middle-management' => 'Scope Description',
+            'bloopy-works-first-level-management' => 'Scope Description',
+            'bloopy-works-intermediate-or-experienced' => 'Scope Description',
+            'bloopy-works-entry-level' => 'Scope Description',
         ]);
     }
 }

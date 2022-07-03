@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\HasApiTokens;
 use App\Models\Business\Business;
+use App\Models\Business\BusinessBranch;
 use Illuminate\Support\Facades\Bus;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -52,9 +53,16 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
     ];
 
-    public function business() {
+    public function business() 
+    {
         return $this->belongsToMany(Business::class, 'user_business', 'userBusiness_user', 'userBusiness_business')
                     ->withPivot('userBusiness_status')
                     ->as('userBusiness');
     }
+
+    public function businessBranch() 
+    {
+        return $this->hasMany(businessBranch::class, 'businessBranch_business', 'userBusiness_business');
+    }
+
 }

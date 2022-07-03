@@ -3,12 +3,16 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Business\BusinessController;
+use App\Http\Controllers\Business\BusinessBranchController;
+use App\Http\Controllers\Business\BusinessInvitationController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Bank\BankController;
 use App\Http\Controllers\Bank\UserBankController;
 use App\Http\Controllers\User\UserController;
-use App\Models\Business\Business;
+use App\Http\Controllers\BloopyWorks\EmployeeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,10 +49,10 @@ Route::post('/passport/reset-password', [NewPasswordController::class, 'store'])
                 ->middleware('guest')
                 ->name('password.update');
 
-Route::get('/passport/verify-email/{id}/{hash}', [AuthController::class, 'emailVerify'])
+Route::get('/passport/verify-email', [AuthController::class, 'emailVerify'])
      ->name('verification.verify');
 
-Route::post('/passport/verify-email/{id}/{hash}', [AuthController::class, 'emailVerify'])
+Route::post('/passport/verify-email', [AuthController::class, 'emailVerify'])
      ->name('verification.verify');
 
 Route::post('/passport/email/verification-notification', [AuthController::class, 'emailNotification'])
@@ -63,11 +67,11 @@ Route::middleware(['auth:api', 'verified'])->group(function() {
     Route::get('/passport/user', [AuthController::class, 'user']);
 
     // Business Routes
+    Route::get('/business/list', [BusinessController::class, 'listBusiness']);  
+    Route::get('/business/{id}', [BusinessController::class, 'businessDetail']);
     Route::post('/business', [BusinessController::class, 'createBusiness']);
     Route::put('/business/{id}', [BusinessController::class, 'updateBusiness']);
-    Route::get('/business/list', [BusinessController::class, 'listBusiness']); 
-
-    Route::post('/business/invitation',[BusinessController::class, 'createInvitation']);
+    Route::post('/business/select', [BusinessController::class, 'selectBusiness']);
 
     // Bank
     Route::get('/bank', [BankController::class, 'listBank']);
@@ -75,14 +79,27 @@ Route::middleware(['auth:api', 'verified'])->group(function() {
     Route::get('/bank/generate', [BankController::class, 'generateBank']);
     Route::delete('/bank/{id}', [BankController::class, 'deleteBank']);
     Route::post('/bank/validate', [BankController::class, 'validateBank']);
-
-    // User Bank
     Route::get('/bank/user/link', [UserBankController::class, 'linkBank']);
+
+
+    Route::middleware(['scope:bloopy-owner,bloopy-works-c-level,bloopy-works-middle-managementr'])->group(function() {
+     // Route::post('/business/branch/{id}', [BusinessBranchController::class, 'createBranch']);
+     // Route::post('/business/invitation', [BusinessInvitationController::class, 'createInvitation']);
+ 
+     // Bloop Works
+     Route::post('/bloopy-works/employee', [EmployeeController::class, 'create']);
+     Route::get('/bloopy-works/employee/list', [EmployeeController::class, 'list']);
+
+    });
+
 
     // User
     Route::put('/user', [UserController::class, 'update']);
+
+
+     // Bloopy Works Route
 });
 
 // Public Route
     Route::get('/user/realtime-data', [UserController::class, 'getUserRealtimeData']);
-    Route::get('/business/invitation',[BusinessController::class, 'getInvitation']);  
+    Route::get('/business/invitation',[BusinessInvitationController::class, 'getInvitation']);  
